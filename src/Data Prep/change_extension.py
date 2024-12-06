@@ -2,6 +2,7 @@ import os
 import time
 
 
+# Change extensions of the data files to json
 def change_extension(directory):
     # Traverse all subdirectories and files
     for root, _, files in os.walk(directory):
