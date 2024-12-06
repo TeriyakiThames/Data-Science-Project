@@ -70,7 +70,7 @@ class Extract_data:
 
 start_time = time.time()
 
-for i in range(0, 100):
+for i in range(0, 2791):
     # Enter your file path here:
     file_path = f"C:/Users/ASUS/Desktop/Thames' Work/Data Science Project 2024/Project/2018/2018{str(i).zfill(5)}.json"
     ED_class = Extract_data()
@@ -93,4 +93,4 @@ for i in range(0, 100):
 end_time = time.time()
 elapsed_time = end_time - start_time
 # Print the time taken to process the file
-print(f"Time taken for file 2018{str(i).zfill(5)}: {elapsed_time:.2f} seconds")
+print(f"Time taken: {elapsed_time:.2f} seconds")
