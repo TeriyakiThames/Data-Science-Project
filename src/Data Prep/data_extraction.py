@@ -92,5 +92,4 @@ for i in range(0, 2791):
 
 end_time = time.time()
 elapsed_time = end_time - start_time
-# Print the time taken to process the file
-print(f"Time taken: {elapsed_time:.2f} seconds")
+print(f"\nTime taken: {elapsed_time:.2f} seconds")
