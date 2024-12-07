@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 
 # Define a function to extract and clean data
@@ -29,7 +30,7 @@ def clean_data(json_file):
             "City": [],
             "Country": [],
             "Keywords": [],
-            "Classification Code": [],
+            # "Classification Code": [],
         }
 
         # Extracting authors
@@ -87,15 +88,15 @@ def clean_data(json_file):
             extracted_data["Keywords"] = ["Not Available"]
 
         # Extracting Classification Code
-        subject_areas = data.get("subject-areas", {}).get("subject-area")
-        if isinstance(subject_areas, list):
-            for subject_area in subject_areas:
-                code = subject_area.get("@code", "Unknown")
-                extracted_data["Classification Code"].append(
-                    code if code else "Unknown"
-                )
-        else:
-            extracted_data["Classification Code"] = ["Unknown"]
+        # subject_areas = data.get("subject-areas", {}).get("subject-area")
+        # if isinstance(subject_areas, list):
+        #     for subject_area in subject_areas:
+        #         code = subject_area.get("@code", "Unknown")
+        #         extracted_data["Classification Code"].append(
+        #             code if code else "Unknown"
+        #         )
+        # else:
+        #     extracted_data["Classification Code"] = ["Unknown"]
 
         # Clean duplicates and empty values
         extracted_data["Authors"] = list(set(filter(None, extracted_data["Authors"])))
@@ -150,5 +151,11 @@ output_folder = (
     "C:/Users/ASUS/Desktop/Thames' Work/Data Science Project 2024/Cleaned Data"
 )
 
+start_time = time.time()
+
 # Run the processing function
 process_json_files(input_folder, output_folder)
+
+end_time = time.time()
+elapsed_time = end_time - start_time
+print(f"\nTime taken: {elapsed_time:.2f} seconds")

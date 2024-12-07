@@ -11,13 +11,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 class WebScraping:
     def __init__(self):
         # scrape_site(self):
-        self.delay = 60
+        self.delay = 5
 
         # calculate_loop(self):
         self.start = 10000000
-        self.end = 10700000
-        self.num_iterations = 1000
-        self.doc_id_list = None
+        self.end = 10231000
+
+        # Pun
+        # self.start = 10231001
+        # self.end = 100462000
+
+        # Ploy
+        # self.start = 100462001
+        # self.end = 10700000
+
+        self.num_iterations = 335
 
         # get_browser(self):
         self.html = None
