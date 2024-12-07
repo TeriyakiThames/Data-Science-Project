@@ -1,5 +1,5 @@
 import json
-import time
+from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -68,8 +68,16 @@ class WebScraping:
             date_added_element = browser.find_element(
                 By.XPATH, "//div[contains(@class, 'doc-abstract-dateadded')]"
             )
+            # Extract the date string
             string_date = " ".join(date_added_element.text.strip().split()[-3:])
-            return string_date
+
+            # Parse the date string and convert it to the required format
+            date_object = datetime.strptime(
+                string_date, "%d %B %Y"
+            )  # "09 January 2023"
+            formatted_date = date_object.strftime("%Y-%m-%d")  # "2023-01-09"
+
+            return formatted_date
         except Exception as e:
             print("Error extracting date:", e)
 
@@ -115,8 +123,8 @@ class WebScraping:
                 and not seen_institutions.add(institution.text.strip())
             ]
 
-            # Split the text of each institution information to country, city, and university
-            university, city, country = zip(
+            # Split the text of each institution information to country, city, and institution
+            institution, city, country = zip(
                 *[
                     tuple(map(str.strip, object.split(",")[-3:]))
                     for object in institution_texts
@@ -124,9 +132,9 @@ class WebScraping:
             )
             country = list(set(country))
             city = list(set(city))
-            university = list(set(university))
+            institution = list(set(institution))
 
-            return country, city, university
+            return country, city, institution
 
         except Exception as e:
             print("Error extracting institution/organization:", e)
@@ -159,15 +167,15 @@ class WebScraping:
             print("Error while scraping keywords:", e)
 
     def pack_to_json(
-        self, title, date, authors, country, city, university, keywords, filename
+        self, title, date, authors, country, city, institution, keywords, filename
     ):
         data = {
             "Title": title,
-            "Date": date,
             "Authors": authors,
-            "Country": country,
+            "Date": date,
+            "Institution": institution,
             "City": city,
-            "University": university,
+            "Country": country,
             "Keywords": keywords,
         }
 
