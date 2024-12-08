@@ -11,21 +11,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 class WebScraping:
     def __init__(self):
         # scrape_site(self):
-        self.delay = 5
+        self.delay = 2
 
         # calculate_loop(self):
-        self.start = 10000000
-        self.end = 10231000
-
-        # Pun
-        # self.start = 10231001
-        # self.end = 100462000
-
-        # Ploy
-        # self.start = 100462001
-        # self.end = 10700000
-
-        self.num_iterations = 335
+        self.start = 10350001
+        self.end = 10700001
+        self.num_iterations = 444
 
         # get_browser(self):
         self.html = None
@@ -35,6 +26,7 @@ class WebScraping:
     def calculate_loop(self):
         step = (self.end - self.start) // self.num_iterations
         self.doc_id_list = [self.start + i * step for i in range(self.num_iterations)]
+        self.doc_id_list = self.doc_id_list[::-1]
 
     # Create link to be turned into soups
     def create_url(self, doc_id):
@@ -53,7 +45,7 @@ class WebScraping:
 
     def click_cookies(self, browser):
         try:
-            consent_button = WebDriverWait(browser, 10).until(
+            consent_button = WebDriverWait(browser, self.delay).until(
                 EC.element_to_be_clickable((By.ID, "cookieConsentButtonID"))
             )
             consent_button.click()
@@ -97,12 +89,12 @@ class WebScraping:
     def __find_authors(self, browser):
         try:
             # Find and click the authors button
-            authors_button = WebDriverWait(browser, 10).until(
+            authors_button = WebDriverWait(browser, self.delay).until(
                 EC.element_to_be_clickable((By.ID, "authors"))
             )
             browser.execute_script("arguments[0].scrollIntoView(true);", authors_button)
             authors_button.click()
-            browser.implicitly_wait(5)
+            browser.implicitly_wait(self.delay)
 
             # Scrape authors
             author_elements = browser.find_elements(
@@ -150,7 +142,7 @@ class WebScraping:
     def find_keyword(self, browser):
         try:
             # Find and click the keywords button
-            keywords_button = WebDriverWait(browser, 10).until(
+            keywords_button = WebDriverWait(browser, self.delay).until(
                 EC.element_to_be_clickable((By.ID, "keywords"))
             )
             browser.execute_script(
