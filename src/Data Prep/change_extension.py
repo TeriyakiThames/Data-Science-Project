@@ -3,7 +3,7 @@ import os
 
 class ChangeExtension:
     # Change extensions of the data files to json
-    def change_extension(directory):
+    def change_extension(self, directory):
         # Traverse all subdirectories and files
         for root, _, files in os.walk(directory):
             for filename in files:

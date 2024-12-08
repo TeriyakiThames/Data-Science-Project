@@ -87,25 +87,38 @@ class ImputeMissingValue:
             lambda x: [kw for kw in x if pd.notna(kw)] if isinstance(x, list) else x
         )
         df["Keywords"] = df.apply(
-            lambda row: self.infer_keywords(row.name, df, similarity_matrix), axis=1
+            lambda row: self.infer_keywords(row, df, similarity_matrix), axis=1
         )
+
         return df
 
-    def infer_keywords(self, row_index, df, similarity_matrix):
+    def infer_keywords(self, row, df, similarity_matrix):
         """Infer missing keywords based on the cosine similarity of titles."""
-        if len(df.loc[row_index, "Keywords"]) > 0:
-            return df.loc[row_index, "Keywords"]
-        similar_indices = similarity_matrix[row_index].argsort()[::-1]
+        keywords = row["Keywords"]
+
+        # Check if the 'Keywords' column is not empty
+        if keywords and len(keywords) > 0:
+            return keywords
+
+        # If no keywords are available for the current row, find the most similar rows
+        similar_indices = similarity_matrix[row.name].argsort()[
+            ::-1
+        ]  # row.name gives the index
         for idx in similar_indices:
-            if len(df.loc[idx, "Keywords"]) > 0:
-                return df.loc[idx, "Keywords"]
-        # If no keywords are found, infer based on the most common keywords
-        return [
+            similar_keywords = df.loc[idx, "Keywords"]
+            if similar_keywords and len(similar_keywords) > 0:
+                return similar_keywords
+
+        # If no similar rows with keywords, infer based on the most common keywords
+        all_keywords = [
             kw
-            for kw in pd.Series(
-                [kw for sublist in df["Keywords"] for kw in sublist]
-            ).mode()
+            for sublist in df["Keywords"]
+            if isinstance(sublist, list)
+            for kw in sublist
         ]
+        return (
+            pd.Series(all_keywords).mode().tolist()
+        )  # Return the most common keywords
 
     def clean_location(self, df, column_name):
         """Clean city and country columns."""
@@ -126,6 +139,14 @@ class ImputeMissingValue:
     def save_to_csv(self, df, file_path):
         """Save the cleaned DataFrame to a CSV file."""
         df.to_csv(file_path, index=False)
+
+    def impute_missing_dates(self, df):
+        """Impute missing dates with the most common date."""
+        most_common_date = (
+            df["Date"].mode()[0] if not df["Date"].isnull().all() else None
+        )
+        df["Date"] = df["Date"].fillna(most_common_date)
+        return df
 
     def run(self, folder_path, output_folder):
         """Main method to process and clean all JSON files in a directory."""
@@ -164,6 +185,8 @@ class ImputeMissingValue:
             most_common_institution = (
                 pd.Series(all_institutions).mode()[0] if all_institutions else "Unknown"
             )
+
+            df = self.impute_missing_dates(df)
 
             # Impute missing institutions
             df["Institution"] = df.apply(
