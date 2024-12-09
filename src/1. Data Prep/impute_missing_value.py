@@ -4,6 +4,8 @@ import os
 
 import numpy as np
 import pandas as pd
+import pycountry
+from rapidfuzz import process
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -148,6 +150,54 @@ class ImputeMissingValue:
         df["Date"] = df["Date"].fillna(most_common_date)
         return df
 
+    def clean_country(self, country_name):
+        """Clean and standardize country names."""
+        country_name = country_name.strip().lower()
+        valid_country_names = [country.name.lower() for country in pycountry.countries]
+        if country_name:
+            match = process.extractOne(
+                country_name, valid_country_names, score_cutoff=80
+            )
+            return match[0].title() if match else "Unknown"
+        return "Unknown"
+
+    def expand_and_clean_location(self, df):
+        """Clean, expand, and standardize country and institution columns."""
+
+        # Function to ensure the value is a string
+        def safe_str(x):
+            if isinstance(x, list):
+                return ", ".join(str(item) for item in x)
+            elif pd.notna(x):
+                return str(x)
+            return ""
+
+        # Apply safe_str function to ensure all values in 'Country' and 'Institution' columns are strings
+        df["Country"] = df["Country"].apply(safe_str)
+        df["Institution"] = df["Institution"].apply(safe_str)
+
+        # Clean the 'Country' and 'Institution' columns
+        df["Country"] = df["Country"].str.replace(r"[\[\]']", "", regex=True)
+        df["Institution"] = df["Institution"].str.replace(r"[\[\]']", "", regex=True)
+
+        # Expand rows for 'Country' and 'Institution' in one pass
+        df = (
+            df.assign(Country=df["Country"].str.split(", "))
+            .assign(Institution=lambda x: x["Institution"].str.split(", "))
+            .explode("Country")
+            .explode("Institution")
+            .drop_duplicates(subset=["Title", "Institution"])
+        )
+
+        # Clean and filter the 'Country' column
+        df["Country"] = df["Country"].apply(self.clean_country)
+        df = df[df["Country"] != "Unknown"]
+
+        # Reset index
+        df.reset_index(drop=True, inplace=True)
+
+        return df
+
     def run(self, folder_path, output_folder):
         """Main method to process and clean all JSON files in a directory."""
         if not os.path.isdir(folder_path):
@@ -202,6 +252,9 @@ class ImputeMissingValue:
             # Clean city and country columns
             df = self.clean_location(df, "City")
             df = self.clean_location(df, "Country")
+
+            # Expand and clean 'Country' and 'Institution'
+            df = self.expand_and_clean_location(df)
 
             output_file_name = (
                 os.path.splitext(os.path.basename(file_path))[0] + "_cleaned.csv"
