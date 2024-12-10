@@ -1,15 +1,16 @@
 import ast
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import pyLDAvis
 import seaborn as sns
 import streamlit as st
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import CountVectorizer
-import pickle
-import pyLDAvis
+
 
 @st.cache_data
 # The main dataset is obtained from combining the Scorpus dataset and web scraping dataset
@@ -43,6 +44,42 @@ def load_map_data(file_path):
     except Exception as e:
         st.error(f"Failed to load map data: {e}")
         return pd.DataFrame()
+
+
+@st.cache_data
+def load_document():
+    # Load the documents list from the pickle file
+    with open("documents.pkl", "rb") as f:
+        documents = pickle.load(f)
+        return documents
+
+
+@st.cache_data
+def load_doc_term_matrix():
+    with open("doc_term_matrix.pkl", "rb") as f:
+        doc_term_matrix = pickle.load(f)
+        return doc_term_matrix
+
+
+@st.cache_data
+def load_vectorizer():
+    with open("vectorizer.pkl", "rb") as f:
+        loaded_vectorizer = pickle.load(f)
+        return loaded_vectorizer
+
+
+@st.cache_data
+def load_lda_model_fitted():
+    with open("lda_model_fitted.pkl", "rb") as f:
+        lda_model = pickle.load(f)
+        return lda_model
+
+
+@st.cache_data
+def load_kmeans():
+    with open("kmeans_model.pkl", "rb") as f:
+        kmeans = pickle.load(f)
+        return kmeans
 
 
 def show_title():
@@ -128,71 +165,72 @@ def show_date(dataset):
 def show_cluster(df):
     # List of actual cluster names
     st.header("• K-Means Clustering (PCA)")
-    st.markdown("""
+    st.markdown(
+        """
     - Each dot represents different institutions
     - The colors represents different subject area (cluster)
     - Institution within the same cluster are similar in terms of topic they focus on
-    """)
+    """
+    )
     cluster_names_list = [
-        "Artificial Intelligence", 
-        "Telecommunication Engineering", 
-        "Medical Science", 
-        "Disease Analysis", 
-        "Biomedical Research", 
-        "Environmental Science", 
-        "Pharmaceutical Science", 
-        "Chemical Science", 
-        "Energy and Power Systems", 
-        "Social and Business Studies"
+        "Artificial Intelligence",
+        "Telecommunication Engineering",
+        "Medical Science",
+        "Disease Analysis",
+        "Biomedical Research",
+        "Environmental Science",
+        "Pharmaceutical Science",
+        "Chemical Science",
+        "Energy and Power Systems",
+        "Social and Business Studies",
     ]
-    
-    # Load the documents list from the pickle file
-    with open('Pickle/documents.pkl', 'rb') as f:
-        documents = pickle.load(f)
 
-    ##------------doc_term_matrix-----------##
-    # Load the vectorizer and document-term matrix
-    with open('Pickle/vectorizer.pkl', 'rb') as f:
-        loaded_vectorizer = pickle.load(f)
+    documents = load_document()
 
+    loaded_vectorizer = load_vectorizer()
     doc_term_matrix = loaded_vectorizer.transform(documents)
 
-    ##------------doc_topic_matrix-----------##
-    with open('Pickle/lda_model_fitted.pkl', 'rb') as f:
-        lda_model = pickle.load(f)
-
+    lda_model = load_lda_model_fitted()
     doc_topic_matrix = lda_model.transform(doc_term_matrix)
 
-    ##------------cluster-----------##
-    with open('Pickle/kmeans_model.pkl', 'rb') as f:
-        kmeans = pickle.load(f)
+    kmeans = load_kmeans()
     clusters = kmeans.fit_predict(doc_topic_matrix)
 
-    ##------------------------##
-    institutions = df['Institution'].tolist()
-    institutions = institutions[:-1]  # Adjust length mismatch if needed
-    
+    institutions = df["Institution"].tolist()
+    institutions = institutions[:-1]
+
     pca = PCA(n_components=2)
     reduced_matrix = pca.fit_transform(doc_topic_matrix)
 
-    pca_df = pd.DataFrame(reduced_matrix, columns=['PCA1', 'PCA2'])
-    pca_df['Cluster'] = clusters
-    pca_df['Cluster Name'] = pca_df['Cluster'].map(lambda x: cluster_names_list[int(x)])
-    pca_df['Institution'] = institutions
+    pca_df = pd.DataFrame(reduced_matrix, columns=["PCA1", "PCA2"])
+    pca_df["Cluster"] = clusters
+    pca_df["Cluster Name"] = pca_df["Cluster"].map(lambda x: cluster_names_list[int(x)])
+    pca_df["Institution"] = institutions
 
-    st.write(pca_df[['Institution', 'Cluster', 'Cluster Name', 'PCA1', 'PCA2']])
+    st.write(pca_df[["Institution", "Cluster", "Cluster Name", "PCA1", "PCA2"]])
 
     plt.figure(figsize=(10, 6))
-    sns.scatterplot(x='PCA1', y='PCA2', hue='Cluster Name', palette='Set1', data=pca_df, s=100, marker='o')
+    sns.scatterplot(
+        x="PCA1",
+        y="PCA2",
+        hue="Cluster Name",
+        palette="Set1",
+        data=pca_df,
+        s=100,
+        marker="o",
+    )
 
-    plt.title('PCA of Document-Topic Matrix', fontsize=16)
-    plt.xlabel('PCA Component 1', fontsize=14)
-    plt.ylabel('PCA Component 2', fontsize=14)
+    plt.title("PCA of Document-Topic Matrix", fontsize=16)
+    plt.xlabel("PCA Component 1", fontsize=14)
+    plt.ylabel("PCA Component 2", fontsize=14)
 
-    st.pyplot(plt)  
+    st.pyplot(plt)
     selected_cluster = st.selectbox("Select Cluster", options=cluster_names_list)
-    filtered_df_cluster = pca_df[pca_df['Cluster Name'] == selected_cluster]
-    st.write(f"Data for selected cluster: {selected_cluster}", filtered_df_cluster[['Institution', 'Cluster', 'Cluster Name']])
+    filtered_df_cluster = pca_df[pca_df["Cluster Name"] == selected_cluster]
+    st.write(
+        f"Data for selected cluster: {selected_cluster}",
+        filtered_df_cluster[["Institution", "Cluster", "Cluster Name"]],
+    )
 
 
 def show_country_insights(data):
@@ -206,36 +244,49 @@ def show_country_insights(data):
     country_data = data["Country"].value_counts().head(10)
     st.bar_chart(country_data)
 
+
 def show_LDA():
     st.header("• LDA: Topic-Intermap (pyLDAvis)")
-    st.markdown("""
+    st.markdown(
+        """
     - The size of the circle indicates the topic’s overall prevalence in the corpus
     - The distance between topics indicates how similar they are
     - For each topic, we can see which keywords are the most prevalent
-    """)
+    """
+    )
     data = {
-        "Topic": ["Topic 1", "Topic 2","Topic 3","Topic 4","Topic 5","Topic 6","Topic 7","Topic 8","Topic 9","Topic 10"],
-        "Subject Area": ["Artificial Intelligence", "Disease Analysis", "Medical Science", 
-        "Telecommunication Engineering", 
-        "Biomedical Research", 
-        "Environmental Science", 
-        "Pharmaceutical Science", 
-        "Chemical Science", 
-        "Energy and Power Systems", 
-        "Social and Business Studies"]
+        "Topic": [
+            "Topic 1",
+            "Topic 2",
+            "Topic 3",
+            "Topic 4",
+            "Topic 5",
+            "Topic 6",
+            "Topic 7",
+            "Topic 8",
+            "Topic 9",
+            "Topic 10",
+        ],
+        "Subject Area": [
+            "Artificial Intelligence",
+            "Disease Analysis",
+            "Medical Science",
+            "Telecommunication Engineering",
+            "Biomedical Research",
+            "Environmental Science",
+            "Pharmaceutical Science",
+            "Chemical Science",
+            "Energy and Power Systems",
+            "Social and Business Studies",
+        ],
     }
 
     df1 = pd.DataFrame(data).reset_index(drop=True)
     st.table(df1)
 
-    with open('Pickle/vectorizer.pkl', 'rb') as f:
-        vectorizer = pickle.load(f)
-
-    with open('Pickle/lda_model_fitted.pkl', 'rb') as f:
-        lda_model = pickle.load(f)
-    
-    with open('Pickle/doc_term_matrix.pkl', 'rb') as f:
-        doc_term_matrix = pickle.load(f)
+    vectorizer = load_vectorizer()
+    lda_model = load_lda_model_fitted()
+    doc_term_matrix = load_doc_term_matrix()
 
     vocab = vectorizer.get_feature_names_out()
 
@@ -244,12 +295,13 @@ def show_LDA():
 
     # Prepare data for pyLDAvis
     data = pyLDAvis.prepare(
-        topic_term_dists=lda_model.components_ / lda_model.components_.sum(axis=1)[:, np.newaxis],
+        topic_term_dists=lda_model.components_
+        / lda_model.components_.sum(axis=1)[:, np.newaxis],
         doc_topic_dists=lda_model.transform(doc_term_matrix),
         doc_lengths=np.array(doc_term_matrix.sum(axis=1)).flatten(),
         vocab=vocab,
         term_frequency=term_frequency,
-        sort_topics=False  # Set to True if you want topics sorted by relevance
+        sort_topics=False,  # Set to True if you want topics sorted by relevance
     )
 
     # Convert to HTML
@@ -258,17 +310,18 @@ def show_LDA():
     # Display in Streamlit
     st.components.v1.html(html_string, width=1300, height=800)
 
+
 def run():
-    dataset = load_dataset(r"Data\main_data.csv")
+    dataset = load_dataset("main_data.csv")
     df_dataset = pd.DataFrame(dataset)
 
-    cluster_data = load_cluster_data(r"Data\cluster_data.csv")
+    cluster_data = load_cluster_data("cluster_data.csv")
     df_cluster = pd.DataFrame(cluster_data)
 
-    map_data = load_map_data(r"Data\calculated_map_data.csv")
+    map_data = load_map_data("calculated_map_data.csv")
     df_map = map_data
 
-    filter_data = load_cluster_data(r"Data\filtered_df.csv")
+    filter_data = load_cluster_data("filtered_df.csv")
     filtered_df = pd.DataFrame(filter_data)
 
     show_title()
