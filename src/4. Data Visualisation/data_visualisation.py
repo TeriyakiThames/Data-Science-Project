@@ -162,14 +162,35 @@ def show_date(dataset):
     st.bar_chart(date_data)
 
 
+def transform_document_term_matrix(documents, vectorizer):
+    return vectorizer.transform(documents)
+
+
+# Cache the LDA transformation (to avoid recomputing topic distribution)
+def transform_lda(doc_term_matrix, lda_model):
+    return lda_model.transform(doc_term_matrix)
+
+
+# Cache the PCA reduction to 2 components
+@st.cache_data
+def apply_pca(doc_topic_matrix):
+    pca = PCA(n_components=2)
+    return pca.fit_transform(doc_topic_matrix)
+
+
+# Cache the KMeans clustering
+def perform_kmeans(doc_topic_matrix, kmeans_model):
+    return kmeans_model.fit_predict(doc_topic_matrix)
+
+
 def show_cluster(df):
     # List of actual cluster names
     st.header("• K-Means Clustering (PCA)")
     st.markdown(
         """
     - Each dot represents different institutions
-    - The colors represents different subject area (cluster)
-    - Institution within the same cluster are similar in terms of topic they focus on
+    - The colors represent different subject areas (clusters)
+    - Institutions within the same cluster are similar in terms of topics they focus on
     """
     )
     cluster_names_list = [
@@ -186,29 +207,37 @@ def show_cluster(df):
     ]
 
     documents = load_document()
-
-    loaded_vectorizer = load_vectorizer()
-    doc_term_matrix = loaded_vectorizer.transform(documents)
-
+    vectorizer = load_vectorizer()
     lda_model = load_lda_model_fitted()
-    doc_topic_matrix = lda_model.transform(doc_term_matrix)
-
     kmeans = load_kmeans()
-    clusters = kmeans.fit_predict(doc_topic_matrix)
 
-    institutions = df["Institution"].tolist()
-    institutions = institutions[:-1]
+    # Transform document-term matrix and apply caching
+    doc_term_matrix = transform_document_term_matrix(documents, vectorizer)
 
-    pca = PCA(n_components=2)
-    reduced_matrix = pca.fit_transform(doc_topic_matrix)
+    # Transform document-term matrix using LDA and apply caching
+    doc_topic_matrix = transform_lda(doc_term_matrix, lda_model)
 
+    # Apply PCA and cache results
+    reduced_matrix = apply_pca(doc_topic_matrix)
+
+    # Perform KMeans clustering and cache the results
+    clusters = perform_kmeans(doc_topic_matrix, kmeans)
+
+    # Map institutions to clusters
+    institutions = df["Institution"].tolist()[
+        :-1
+    ]  # Assuming the last one is empty or irrelevant
+
+    # Prepare data for plotting
     pca_df = pd.DataFrame(reduced_matrix, columns=["PCA1", "PCA2"])
     pca_df["Cluster"] = clusters
     pca_df["Cluster Name"] = pca_df["Cluster"].map(lambda x: cluster_names_list[int(x)])
     pca_df["Institution"] = institutions
 
+    # Display the dataframe
     st.write(pca_df[["Institution", "Cluster", "Cluster Name", "PCA1", "PCA2"]])
 
+    # Plot the scatter plot
     plt.figure(figsize=(10, 6))
     sns.scatterplot(
         x="PCA1",
@@ -225,6 +254,8 @@ def show_cluster(df):
     plt.ylabel("PCA Component 2", fontsize=14)
 
     st.pyplot(plt)
+
+    # Cluster selection from dropdown
     selected_cluster = st.selectbox("Select Cluster", options=cluster_names_list)
     filtered_df_cluster = pca_df[pca_df["Cluster Name"] == selected_cluster]
     st.write(
@@ -245,6 +276,23 @@ def show_country_insights(data):
     st.bar_chart(country_data)
 
 
+def calculate_term_frequency(doc_term_matrix):
+    return np.asarray(doc_term_matrix.sum(axis=0)).flatten()
+
+
+# Cache pyLDAvis data preparation
+def prepare_lda_vis_data(lda_model, doc_term_matrix, vocab, term_frequency):
+    return pyLDAvis.prepare(
+        topic_term_dists=lda_model.components_
+        / lda_model.components_.sum(axis=1)[:, np.newaxis],
+        doc_topic_dists=lda_model.transform(doc_term_matrix),
+        doc_lengths=np.array(doc_term_matrix.sum(axis=1)).flatten(),
+        vocab=vocab,
+        term_frequency=term_frequency,
+        sort_topics=False,  # Set to True if you want topics sorted by relevance
+    )
+
+
 def show_LDA():
     st.header("• LDA: Topic-Intermap (pyLDAvis)")
     st.markdown(
@@ -254,6 +302,7 @@ def show_LDA():
     - For each topic, we can see which keywords are the most prevalent
     """
     )
+    # Display Topic-Subject Area mapping
     data = {
         "Topic": [
             "Topic 1",
@@ -284,28 +333,22 @@ def show_LDA():
     df1 = pd.DataFrame(data).reset_index(drop=True)
     st.table(df1)
 
+    # Load vectorizer, LDA model, and document-term matrix
     vectorizer = load_vectorizer()
     lda_model = load_lda_model_fitted()
     doc_term_matrix = load_doc_term_matrix()
 
+    # Get vocabulary and calculate term frequencies
     vocab = vectorizer.get_feature_names_out()
+    term_frequency = calculate_term_frequency(doc_term_matrix)
 
-    # Calculate term frequencies
-    term_frequency = np.asarray(doc_term_matrix.sum(axis=0)).flatten()
-
-    # Prepare data for pyLDAvis
-    data = pyLDAvis.prepare(
-        topic_term_dists=lda_model.components_
-        / lda_model.components_.sum(axis=1)[:, np.newaxis],
-        doc_topic_dists=lda_model.transform(doc_term_matrix),
-        doc_lengths=np.array(doc_term_matrix.sum(axis=1)).flatten(),
-        vocab=vocab,
-        term_frequency=term_frequency,
-        sort_topics=False,  # Set to True if you want topics sorted by relevance
+    # Prepare pyLDAvis data (cached)
+    lda_vis_data = prepare_lda_vis_data(
+        lda_model, doc_term_matrix, vocab, term_frequency
     )
 
     # Convert to HTML
-    html_string = pyLDAvis.prepared_data_to_html(data)
+    html_string = pyLDAvis.prepared_data_to_html(lda_vis_data)
 
     # Display in Streamlit
     st.components.v1.html(html_string, width=1300, height=800)
